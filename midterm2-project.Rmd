@@ -28,7 +28,7 @@ We will be looking at the data for the amount of times a helicopter is requested
 Assess normality with a qqplot.
 ```{r}
 #import data
-heli <- read.csv("~/Downloads/college/2020-2021-classes/STA106/midterm2/Helicopter.csv")
+heli <- read.csv("/Users/ankitasingh/Documents/STA-106-Projects/helicopter.csv")
 
 #qq plot
 the.model = lm(Count ~ Shift,data = heli)
@@ -191,7 +191,7 @@ We are looking at the Salary dataset which is  taken from a random sample of "te
 
 ## Summary of Data
 ```{r}
-Salary <- read.csv("~/Downloads/college/2020-2021-classes/STA106/midterm2/Salary.csv")
+Salary <- read.csv("/Users/ankitasingh/Documents/STA-106-Projects/salary.csv")
 ```
 
 ```{r}

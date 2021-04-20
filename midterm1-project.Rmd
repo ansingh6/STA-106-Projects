@@ -29,7 +29,7 @@ The following graphs are three different ways to visualize the spread of the dat
 
 ```{r}
 #import data
-sparrow = read.csv("~/Downloads/college/2020-2021-classes/STA106/midterm1/sparrow.csv")
+sparrow = read.csv("/Users/ankitasingh/Documents/STA-106-Projects/sparrow.csv")
 
 #using tidyverse
 library(tidyverse)
