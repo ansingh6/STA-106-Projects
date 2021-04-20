@@ -1,0 +1,248 @@
+---
+title: 'Midterm Project 1: STA 106'
+author: "Air Singh, Kate Johnson, James Chapman"
+date: "2/9/2021"
+output: pdf_document
+  
+---
+
+```{r, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(
+	error = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	echo = FALSE, # hide all R code
+	fig.width=5, fig.height=4,#set figure size
+	fig.align='center',#center plot
+	options(knitr.kable.NA = ''), #do not print NA in knitr table
+	tidy = FALSE #add line breaks in R code
+)
+```
+
+# Introduction
+We are trying to find if there is any relationship between sparrow's nest size and sparrow weight for the sparrows that inhabit Kent Island. This information could be useful if we want to encourage healthy population growth of the sparrows on Kent Island by setting up nests that lead to the highest weight. To find this relationship we look at data from a study which placed large, small, and normal sized nests over Kent Island and measured the weight of the sparrows which nested in them. To analyze this data we will be using the single factor ANOVA model.
+
+## Visualizing the Data
+
+The following graphs are three different ways to visualize the spread of the data. We can see from the aggregated boxplot that our data contains four outliers. These will be removed in a later step so that we can assume all $\epsilon_{i,j}$~$N(0,\sigma_\epsilon^2)$ and continue working with the ANOVA model.
+
+
+```{r}
+#import data
+sparrow = read.csv("~/Downloads/college/2020-2021-classes/STA106/midterm1/sparrow.csv")
+
+#using tidyverse
+library(tidyverse)
+
+#histogram
+qplot(Weight, data = sparrow, binwidth = 1, main = "Histogram of Sparrow Weight by Nest Size", xlab = "Weight", ylab = "Frequency")
+
+#boxplot
+boxplot(sparrow$Weight, main = "Boxplot of Sparrow Weight by Nest Size",ylab = "Weight")
+
+#faceted histogram
+qplot(Weight, data = sparrow, binwidth = 1, facets = ~Treatment, main = "Histogram of Sparrow Weight by Nest Size", xlab = "Weight", ylab = "Nest Size")
+
+#faceted scatterplot
+qplot(Weight, Treatment, data = sparrow) + ggtitle("Scatterplot of Sparrow Weight by Nest Size") + xlab("Weight") + ylab("Nest Size") + coord_flip()
+
+#faceted boxplot
+boxplot(sparrow$Weight ~ sparrow$Treatment, main = "Boxplot of Sparrow Weight by Nest Size",ylab = "Weight", xlab = "Nest Size")
+```
+
+```{r, results='hide'}
+#remove outliers
+outliers = boxplot(sparrow$Weight, plot=FALSE)$out
+sparrow.clean = sparrow[-which(sparrow$Weight %in% outliers),]
+```
+
+
+```{r, results='hide'}
+#group means
+group.means = by(sparrow.clean$Weight,sparrow.clean$Treatment,mean)
+
+#group sd
+group.sds = by(sparrow.clean$Weight,sparrow.clean$Treatment,sd)
+
+#group Nis
+group.nis = by(sparrow.clean$Weight,sparrow.clean$Treatment,length)
+
+cbind(group.means, group.sds, group.nis)
+```
+
+# Summary of the Data
+
+Explanatory variable: Nest Size
+
+Response variable: Nesting Sparrow's Weight
+
+C = control, L = enlarged, R = reduced
+
+Group means: $\bar{X_C}=$ `r group.means[1]`, $\bar{X_L}=$ `r group.means[2]`, $\bar{X_R}=$ `r group.means[3]`.
+
+Group Standard deviations: $s_C=$ `r group.sds[1]`, $s_L=$ `r group.sds[2]`, $s_R=$ `r group.sds[3]`.
+
+Group Sample Size: $n_C=$ `r group.nis[1]`, $n_L=$ `r group.nis[2]`, $n_R=$ `r group.nis[3]`.
+
+# Diagnostics
+
+For the single factor ANOVA model we are assuming that all of our observations are independent, groups are independent, and that the variance of all observations is normally distributed on $N(0,\sigma_\epsilon^2)$. Looking at a boxplot of the data, we find that there are four outliers. These are removed before we begin our analysis. 
+
+
+
+```{r}
+#find the model
+the.model = lm(Weight ~ Treatment, data = sparrow.clean)
+anova.table = anova(the.model)
+
+#error vs group means
+plot(the.model$fitted.values, the.model$residuals, main = "Errors vs. Group Means",xlab = "Group Means",ylab = "Errors",pch = 19,font = 2,font.lab =1,cex =1,cex.lab=1, cex.axis=1, cex.main=2, cex.sub=2)
+abline(h = 0,col = "purple")
+
+```
+  Here our plot visualizes the constant variance assumption we have made for this section, in which we find that in this test for equal variance our subjective opinion of the model is that the residuals plotted by each group is approximately unequal. This plot is of our residuals $e_{ij}$ with the fitted value of $\hat{E} (Y_{ij})$.
+
+```{r, echo = FALSE}
+#normal QQplot
+qqnorm(the.model$residuals,pch = 19,font = 2,font.lab =1,cex =1,cex.lab=1, cex.axis=1, cex.main=2, cex.sub=2)
+qqline(the.model$residuals)
+```
+
+Without transforming the given data, we look at a qqplot, which compares our data with the normal distribution. If the correlation is close to 1 we can assume that the data is normally distributed. From the qqplot of our values, we find that our data is approximately normally distributed with a slight left tail.
+
+
+```{r, echo = FALSE}
+#studentized model
+alpha = 0.05
+a = length(unique(sparrow.clean$Treatment))
+nt = nrow(sparrow.clean)
+t.cutoff= qt(1-alpha/(2*nt), nt-a)
+rij = rstandard(the.model)
+CO.rij = which(abs(rij) > t.cutoff)
+hist(rij, main = "Studentized Residuals")
+```
+
+Relaxing the assumption of equal variance, we calculate the estimated variance through studentized residuals. We then use the residuals that we find and compare them to a quantile of a t, namely $t_{nt-a}$. 
+
+## Perform the Shapiro-Wilks test to check if data is normally distributed.
+
+We find the p-value for the Shapiro-Wilks test to be 0.04436. Since this is lower than our significance level of $\alpha=0.05$, we can reject the $H_0$ and assume that the data is not normally distributed.
+
+## Perform the Brown-Forsythe test if the group variances are equal.
+
+We find that the p-value of the Brown-Forsythe test is 0.0001631387. Since this is lower than our significance level of $\alpha=0.05$, we have evidence to reject the $H_0$ and say that at least one of the groups variance is unequal.
+
+```{r, results='hide'}
+#shapiro wilks test
+shapiro.test(sparrow.clean$Weight)
+
+#Brown-Forsythe Test
+#install.packages("onewaytests")
+library(onewaytests)
+bf.test(Weight~Treatment, sparrow.clean, alpha = 0.05, na.rm = TRUE, verbose = TRUE)
+```
+
+```{r, results='hide'}
+#anova stats
+the.model = lm(Weight ~ Treatment, data = sparrow.clean)
+anova.table = anova(the.model)
+
+#power of test
+give.me.power = function(ybar,ni,MSE,alpha){
+  a = length(ybar) # Finds a
+  nt = sum(ni) #Finds the overall sample size
+  overall.mean = sum(ni*ybar)/nt # Finds the overall mean
+  phi = (1/sqrt(MSE))*sqrt( sum(ni*(ybar - overall.mean)^2)/a)   #Finds the books value of p
+  phi.star = a *phi^2 #Finds the value of phi we will use for R
+  Fc = qf(1-alpha,a-1,nt-a) #The critical value of F, use in   R’s function
+  power = 1 - pf(Fc, a-1, nt-a, phi.star)# The power, calculated using a non-central F return(power)
+}
+
+group.means = by(sparrow.clean$Weight,sparrow.clean$Treatment,mean)
+group.nis = by(sparrow.clean$Weight,sparrow.clean$Treatment,length) 
+the.model = lm(Weight ~ Treatment, data = sparrow.clean) 
+anova.table = anova(the.model)
+MSE = anova.table[2,3]
+
+the.power = give.me.power(group.means,group.nis,MSE,0.05)
+
+#confidence interval of reduced nest
+give.me.CI = function(ybar,ni,ci,MSE,multiplier){ 
+  if(sum(ci) != 0 & sum(ci !=0 ) != 1){
+    return("Error - you did not input a valid contrast")
+  } else if(length(ci) != length(ni)){
+    return("Error - not enough contrasts given")
+  }
+  else{
+    estimate = sum(ybar*ci)
+    SE = sqrt(MSE*sum(ci^2/ni))
+    CI = estimate + c(-1,1)*multiplier*SE
+    result = c(estimate,CI)
+    names(result) = c("Estimate","Lower Bound","Upper Bound")
+    return(result)
+  }
+}
+
+t.value = qt(1-0.05/2, sum(group.nis) - length(group.nis))
+ci.1 = c(0,0,1) #Only mu_reduced is included
+ci.reduced = give.me.CI(group.means,group.nis,ci.1,MSE,t.value)
+
+#simultaneous confidence intervals 
+nt = sum(group.nis)
+a = length(group.means)
+alpha = 0.05
+g=2
+B = qt(1-alpha/(2*g),nt-a)
+ci0 = c(0,0,1) #reduced, CI for single mean that had been the largest
+ci1=c(1,0,-1) #control-reduced
+ci2=c(1,-1,0) #control-enlarged
+ci.control.reduced = give.me.CI(group.means,group.nis,ci1,MSE,B)
+ci.control.enlarged = give.me.CI(group.means,group.nis,ci2,MSE,B)
+```
+# Analysis
+
+Null and Alternative Hypothesis:
+
+$H_0: \mu_C = \mu_L = \mu_R$. 
+
+The null hypothesis is that all of the group means are equal.
+
+$H_a$: At least one $\mu_i\neq\mu_i`$. 
+
+The alternative hypothesis is that at least one group mean is not equal to the others.
+
+The Anova Table
+
+`r anova.table`
+
+The test statistic is $F_s = \frac{MSA}{MSE} = \frac{27.1974}{3.0579} = 8.8942$.
+
+The p-value of this $F_s$ is 0.0002642.
+
+The power of the test is 0.9692258.
+
+We are 95% confident that the true mean of the reduced group is between `r ci.reduced[2]` and `r ci.reduced[3]`.
+
+We are 95% confident that the true difference of means between the control and reduced groups is between `r ci.control.reduced[2]` and `r ci.control.reduced[3]` higher for the control group.
+
+We are 95% confident that the true difference of means between the control and enlarged groups is between `r ci.control.enlarged[2]` and `r ci.control.enlarged[3]` higher for the control group.
+
+
+
+# Interpretation
+
+Since the p-value for our $F_s$ is lower than our $\alpha=0.05$ we reject the $H_0$. We have evidence to suggest that the size of a nest influences the size of the sparrow which will nest in it.
+
+Since our confidence interval for $\mu_C-\mu_R$ contains zero, we conclude that there is not a statistically significant difference in sparrow weight between the control groups and the reduced group.
+
+Since our confidence interval for $\mu_C-\mu_L$ does not contain zero, we conclude that there is a statistically significant difference in sparrow weight between the control groups and the enlarged group.
+
+# Conclusion
+
+We have found that the mean weight of sparrows by nest size differ from each other. This means that different size nests can lead to different weights of the sparrows which nest in them. We have found a statistically significant difference in mean weights of sparrows from the control and enlarged groups where the control group has a higher weight. Although the mean weight for the reduced nest size is higher than the control nest size, we were unable to find a statistically significant difference in mean weights from the control and reduced groups.
+
+# Appendix
+
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
+
