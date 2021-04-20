@@ -1,0 +1,548 @@
+---
+title: "Midterm 2 Project"
+author: "Air Singh, Kate Johnson, James Chapman"
+date: "3/9/2021"
+output: pdf_document
+---
+
+```{r, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(
+	error = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	echo = FALSE, # hide all R code
+	fig.width=5, fig.height=4,#set figure size
+	fig.align='center',#center plot
+	options(knitr.kable.NA = ''), #do not print NA in knitr table
+	tidy = FALSE #add line breaks in R code
+)
+```
+
+# Report for Part I
+
+## Introduction
+We will be looking at the data for the amount of times a helicopter is requested during a certain shift. We have two variables, Count and Shift. Count is the number of times a helicopter has been requested for an emergency in a year. For the Shift variable, the day is broken up into four shifts.
+
+## Data Plots
+
+Assess normality with a qqplot.
+```{r}
+#import data
+heli <- read.csv("~/Downloads/college/2020-2021-classes/STA106/midterm2/Helicopter.csv")
+
+#qq plot
+the.model = lm(Count ~ Shift,data = heli)
+qqnorm(the.model$residuals)
+qqline(the.model$residuals)
+```
+
+We can also perform the Shapiro-Wilks test to see if the data is normally distributed.
+```{r, results='hide'}
+#test normality
+ei = the.model$residuals
+the.SWtest = shapiro.test(ei)
+the.SWtest
+
+```
+Since the p-value is 3.945e-09, we can assume the data is not normally distributed.
+
+We can assess equal variance with an error vs. groups plot
+```{r}
+the.model = lm(Count ~ Shift,data = heli)
+plot(the.model$fitted.values, the.model$residuals, main = "Errors vs. Groups",xlab = "Groups",ylab = "Errors")
+abline(h = 0,col = "purple")
+
+```
+
+We can test for equal variance by the Brown-Forsythe test.
+```{r, results='hide'}
+library(car)
+the.BFtest = leveneTest(ei~ Shift, data=heli, center=median)
+p.val = the.BFtest[[3]][1]
+p.val
+
+```
+
+If we assume $\alpha = 0.05$ and our p-value is 0.03185955, we can conclude that there is not equal variance.
+
+The original model does not fit our ANOVA assumptions as it violates normality and constant variance.
+
+## Outlier Removal and Transformation
+
+### Outlier Removal
+
+We will remove outliers through studentized residuals.
+```{r, results='hide'}
+the.model = lm(Count ~ Shift,data = heli)
+rij = rstandard(the.model)
+alpha = 0.05
+nt = nrow(heli)
+a = length(unique(heli$Shift))
+t.cutoff= qt(1-alpha/(2*nt), nt-a)
+CO.rij = which(abs(rij) > t.cutoff)
+outliers = CO.rij
+new.data = heli[-outliers,]
+new.model = lm(Count ~ Shift,data = new.data)
+
+```
+
+We can assess normality with the Shapiro-Wilks test
+```{r, results='hide'}
+ei = new.model$residuals
+the.SWtest = shapiro.test(ei)
+the.SWtest
+
+```
+
+Since the p-value is 3.673e-05, we can conclude that the data is not normally distributed even after the removal of outliers.
+
+We can assess if there is equal variance with the Brown-Forsythe test.
+```{r, results='hide'}
+the.BFtest = leveneTest(ei~ Shift, data=new.data, center=median)
+p.val = the.BFtest[[3]][1]
+p.val
+
+```
+
+If we assume $\alpha = 0.05$ and our p-value is 0.02825566, we can conclude that there is not equal variance after removal of outliers.
+
+
+### Transformation
+
+We will be using the log-likelihood method to transform our data
+```{r, results='hide'}
+library(EnvStats)
+the.model = lm(Count ~ Shift,data = heli)
+boxcox(heli$Count,objective.name = "Log-Likelihood")
+L3 = boxcox(heli$Count,objective.name = "Log-Likelihood",optimize = TRUE)$lambda
+ YT = (heli$Count^(L3)-1)/L3
+ t.data = data.frame(Count = YT, Shift = heli$Shift)
+ t.model = lm(Count ~ Shift,data = t.data)
+ 
+```
+
+We can perform the Shapiro-Wilks test to see if the data is normally distributed.
+```{r, results='hide'}
+#test normality
+ei = t.model$residuals
+the.SWtest = shapiro.test(ei)
+the.SWtest
+
+```
+
+Assuming $\alpha = 0.05$, our p-value is 0.06739, so we can conclude that the data is normally distributed.
+
+We can assess if there is equal variance with the Brown-Forsythe test.
+```{r, results='hide'}
+the.BFtest = leveneTest(ei~ Shift, data=t.data, center=median)
+p.val = the.BFtest[[3]][1]
+p.val
+
+```
+
+Our p-value is 0.6596686, so we can conclude that there is equal variance for the transformed data.
+
+
+### Outlier Removal and Transformation
+
+We will remove outliers with the studentized model method and transform the data with the log-likelihood method.
+```{r, results='hide'}
+new.model = lm(Count ~ Shift,data = new.data)
+
+library(EnvStats)
+boxcox(new.data$Count,objective.name = "Log-Likelihood")
+L3 = boxcox(new.data$Count,objective.name = "Log-Likelihood",optimize = TRUE)$lambda
+YT = (new.data$Count^(L3)-1)/L3
+tran.data = data.frame(Count = YT, Shift = new.data$Shift)
+tran.model = lm(Count ~ Shift, data = tran.data)
+
+```
+
+We can perform the Shapiro-Wilks test to see if the data is normally distributed.
+```{r, results='hide'}
+#test normality
+ei = tran.model$residuals
+the.SWtest = shapiro.test(ei)
+the.SWtest
+
+```
+Assuming $\alpha = 0.05$, our p-value is 0.02789, so we can conclude that the data is not normally distributed.
+
+We can assess if there is equal variance with the Brown-Forsythe test.
+```{r, results='hide'}
+ei = tran.model$residuals
+the.BFtest = leveneTest(ei ~ Shift, data=tran.data, center=median)
+p.val = the.BFtest[[3]][1]
+p.val
+
+```
+
+Our p-value is 0.678442, so we can conclude that there is equal variance for the transformed data.
+
+## Discussion
+
+The transformation (without the removal of outliers) is the best fit since it has both normal distribution and constant variance. It would be recommended to use the transformed data without the removal of outliers. The transformation of the data helped both in correcting for normal distribution and constant variance. The downside of the transformation is that now it will be difficult to interpret the results, such as creating confidence intervals.
+
+# Report for Part II
+
+## Introduction
+
+We are looking at the Salary dataset which is  taken from a random sample of "technology workers" from Seattle and San Francisco. The explanatory variables in the dataset are Profession (factor A), which can be either Data Scientist (DS), Software Engineer (SE), or Bioinformatics Engineer (BE), and Region (Factor B), which can be either San Francisco (SF) or Seattle (S). The response variable is the Annual Salary of the workers in thousands of dollars. We are trying to construct the best possible Two-Factor ANOVA model to fit this data. To do this we will be summarizing the data, removing outliers, checking the ANOVA assumptions, assessing the normality / equal variance, transforming the data if necessary, fitting a model to the data, and constructing confidence intervals for the data. For R purposes, in Factor A let i = 1 to be 'Bioinformatics Engineer(BE)', i = 2 'Data Scientist(DS)', i = 3 'Software Engineer'. In Factor B, let j = 1 follow 'San Francisco' and j = 2 for 'Seattle'. 
+
+## Summary of Data
+```{r}
+Salary <- read.csv("~/Downloads/college/2020-2021-classes/STA106/midterm2/Salary.csv")
+```
+
+```{r}
+#lists of Professors Functions used:
+find.means = function(the.data,fun.name = mean){
+  a = length(unique(the.data[,2]))
+  b = length(unique(the.data[,3]))
+  means.A = by(the.data[,1], the.data[,2], fun.name)
+  means.B = by(the.data[,1],the.data[,3],fun.name)
+  means.AB = by(the.data[,1],list(the.data[,2],the.data[,3]),fun.name)
+  MAB = matrix(means.AB,nrow = b, ncol = a, byrow = TRUE)
+  colnames(MAB) = names(means.A)
+  rownames(MAB) = names(means.B)
+  MA = as.numeric(means.A)
+  names(MA) = names(means.A)
+  MB = as.numeric(means.B)
+  names(MB) = names(means.B)
+  results = list(A = MA, B = MB, AB = MAB)
+  return(results)
+}
+
+find.mult = function(alpha,a,b,dfSSE,g,group){
+if(group == "A"){
+Tuk = round(qtukey(1-alpha,a,dfSSE)/sqrt(2),3)
+Bon = round(qt(1-alpha/(2*g), dfSSE ) ,3)
+Sch = round(sqrt((a-1)*qf(1-alpha, a-1, dfSSE)),3)
+}else if(group == "B"){
+Tuk = round(qtukey(1-alpha,b,dfSSE)/sqrt(2),3)
+Bon = round(qt(1-alpha/(2*g), dfSSE ) ,3)
+Sch = round(sqrt((b-1)*qf(1-alpha, b-1, dfSSE)),3)
+}else if(group == "AB"){
+Tuk = round(qtukey(1-alpha,a*b,dfSSE)/sqrt(2),3)
+Bon = round(qt(1-alpha/(2*g), dfSSE ) ,3)
+Sch = round(sqrt((a*b-1)*qf(1-alpha, a*b-1, dfSSE)),3)
+}
+results = c(Bon, Tuk,Sch)
+names(results) = c("Bonferroni","Tukey","Scheffe")
+return(results)
+}
+
+
+#Confidence Intervals (6, 4 pairwise, 2 contrasts)
+scary.CI = function(the.data,MSE,equal.weights = TRUE,multiplier,group,cs){
+  if(sum(cs) != 0 & sum(cs !=0 ) != 1){
+  return("Error - you did not input a valid contrast")
+  }else{
+  the.means = find.means(the.data)
+  the.ns =find.means(the.data,length)
+  nt = nrow(the.data)
+  a = length(unique(the.data[,2]))
+  b = length(unique(the.data[,3]))
+  if(group =="A"){
+  if(equal.weights == TRUE){
+  a.means = rowMeans(the.means$AB)
+  est = sum(a.means*cs)
+  mul = rowSums(1/the.ns$AB)
+  SE = sqrt(MSE/b^2 * (sum(cs^2*mul)))
+  N = names(a.means)[cs!=0]
+  CS = paste("(",cs[cs!=0],")",sep = "")
+  fancy = paste(paste(CS,N,sep =""),collapse = "+")
+  names(est) = fancy
+  } else{
+    a.means = the.means$A
+    est = sum(a.means*cs)
+    SE = sqrt(MSE*sum(cs^2*(1/the.ns$A)))
+    N = names(a.means)[cs!=0]
+    CS = paste("(",cs[cs!=0],")",sep = "")
+    fancy = paste(paste(CS,N,sep =""),collapse = "+")
+    names(est) = fancy
+  }
+}else if(group == "B"){
+  if(equal.weights == TRUE){
+  b.means = colMeans(the.means$AB)
+  est = sum(b.means*cs)
+  mul = colSums(1/the.ns$AB)
+  SE = sqrt(MSE/a^2 * (sum(cs^2*mul)))
+  N = names(b.means)[cs!=0]
+  CS = paste("(",cs[cs!=0],")",sep = "")
+  fancy = paste(paste(CS,N,sep =""),collapse = "+")
+  names(est) = fancy
+  } else{
+  b.means = the.means$B
+  est = sum(b.means*cs)
+  SE = sqrt(MSE*sum(cs^2*(1/the.ns$B)))
+  N = names(b.means)[cs!=0]
+  CS = paste("(",cs[cs!=0],")",sep = "")
+  fancy = paste(paste(CS,N,sep =""),collapse = "+")
+  names(est) = fancy
+  }
+  } else if(group == "AB"){
+  est = sum(cs*the.means$AB)
+  SE = sqrt(MSE*sum(cs^2/the.ns$AB))
+  names(est) = "someAB"
+} 
+the.CI = est + c(-1,1)*multiplier*SE
+results = c(est,the.CI)
+names(results) = c(names(est),"lower bound","upper bound")
+return(results)
+  }
+}
+```
+
+```{r}
+#Histograms and plots
+the.data = Salary
+nt = nrow(the.data)
+a = length(unique(the.data[,2]))
+b = length(unique(the.data[,3]))
+names(the.data) = c("Y","A","B")
+
+the.means = find.means(the.data)
+the.sizes=find.means(the.data,length)
+the.sds=find.means(the.data,sd)
+A.B = lm(Y ~ A + B,the.data)
+AB = lm(Y ~ A*B,the.data)
+A = lm(Y ~ A,the.data)
+B = lm(Y ~ B,the.data)
+N = lm(Y ~ 1, the.data)
+all.models = list(AB,A.B,A,B,N)
+
+#Row Of SSE for All Models
+SSE = t(as.matrix(sapply(all.models,function(M) sum(M$residuals^2))))
+colnames(SSE) = c("AB","(A+B)","A","B","Empty/Null")
+rownames(SSE) = "SSE"
+SSE
+```
+Our data has a sample size of $n_T$ = 120, a = 3, and b = 2.
+
+To take a look more into the dataset we are given, we look at the possible models we can construct under Two Factor ANOVA, and look into the SSE of each. While we cannot directly compare the SSE's to each to come to a conclusion, this gives us information that will be useful in later tests.
+
+```{r}
+#Group Means
+the.means$A
+the.means$B
+the.means$AB
+```
+
+Above we find a table with the group and treatment means of the model.
+
+```{r}
+#Group Sizes
+the.sizes$A
+the.sizes$B
+the.sizes$AB
+```
+Above we find the sample sizes of each group, and conclude that each sample had the same size, we continue our tests assuming equal weight in the data.
+
+```{r}
+#Interaction Plot
+interaction.plot(the.data$A, the.data$B,the.data$Y, xlab = 'Profession (Factor A)', ylab = 'Mean of Annual Salary', trace.label = deparse1(substitute(Region (Factor-B))))
+```
+We can see from the interaction plot that there appears to be an interaction effect. If there were no interaction then these two lines would be mostly parallel. We can see a difference when moving from DS to SE between the two regions. We will have to test to see if this interaction effect is significant.
+
+## Diagnostics
+
+Two-factor ANOVA Assumptions:
+
+1: All $Y_{ijk}$ are randomly selected,
+
+2: All levels of factor A are independent,
+
+3: All levels of factor B are independent,
+
+4: $\epsilon_{ijk}$~$N(0,\sigma^2_\epsilon)$ for all $i,j,k$.
+
+To check ANOVA assumptions we constructed 3 plots.
+```{r,}
+#qqplots = t(as.matrix(sapply(all.models,function(M) qqnorm(M$residuals^2))))
+the.data$ei = AB$residuals
+ei = AB$residuals
+the.model = AB
+```
+
+```{r}
+#Errors vs Group Means plot
+plot(the.model$fitted.values, AB$residuals, main = "Errors vs. Group Means",xlab = "Group Means",ylab = "Errors")
+abline(h = 0,col = "purple")
+```
+
+The first plot we created is the Errors vs Group Means plot, showing that the variance between groups is similar. We can see this because each of the vertical bars which represent the residuals within each group are similar.
+
+```{r}
+#QQnorm Plot
+qqnorm(the.model$residuals)
+qqline(the.model$residuals)
+```
+
+We can see from the qq-plot that the data is approximately normal. Since our data follows along the line this means that the quantiles of our data approximately match the quantiles of the normal distribution. 
+
+```{r}
+#Histogram of Errors Plot
+hist(the.model$residuals,main = "Histogram of errors",xlab = "e_ij (in months)")
+```
+The Histogram of Errors plot appears to be approximately normal with mean 0 and an equal spread, $\sigma^2_{\epsilon}$.
+
+We can also see from these plots that there appear to be no significant outliers.
+
+
+
+## Analysis
+
+```{r,}
+#Choosing the Best Model: Hypothesis testing and Partial R^2 values.
+Partial.R2 = function(small.model,big.model){
+  SSE1 = sum(small.model$residuals^2)
+  SSE2 = sum(big.model$residuals^2)
+  PR2 = (SSE1 - SSE2)/SSE1
+  return(PR2)
+}
+RAB = Partial.R2(A.B,AB)
+RA =Partial.R2(A,A.B)
+RB = Partial.R2(B,A.B)
+RAO=Partial.R2(N,A)
+RBO = Partial.R2(N,B)
+```
+
+### Partial R Squares
+
+We calculated the conditional percentage of error reduction $R^2$ to test how the $SSE$ changed when adding different factors to our model.
+
+$R^2${$AB|A+B$} = 0.0501
+
+This is the reduction in error when adding the interaction effect to the model. It makes sense that the $R^2$ when adding the interaction effect would be low, since we failed to conclude that there was an interaction effect.
+
+$R^2${$A+B|B$} = 0.09602
+
+This is the reduction in error when adding factor A to the model.
+
+$R^2${$A+B|A$} = 0.59726
+
+This is the reduction in error when adding factor B to the model.
+
+These $R^2$ models would indicate that we should use the model $Y_{ijk}=\mu..+\gamma_i+\delta_j+e_{ijk}$.
+
+```{r,}
+
+#Test Statistics, Interaction, Factor A and Factor B
+TAB = anova(A.B,AB)
+TA = anova(B,A.B)
+TB = anova(A,A.B)
+
+TAB; TA; TB;
+```
+
+```{r,}
+#Finding a Multiplier Function
+
+MSE = SSE[1]/(nt-a*b)
+
+
+BonA = find.mult(alpha = 0.01, a = 3, b = 2, dfSSE = 120 - 2*3, g = 6, group = "A")[1]
+TukA = find.mult(alpha = 0.01, a = 3, b = 2, dfSSE = 120 - 2*3, g = 6, group = "A")[2]
+SchA = find.mult(alpha = 0.01, a = 3, b = 2, dfSSE = 120 - 2*3, g = 6, group = "A")[3]
+
+BonB = find.mult(alpha = 0.01, a = 3, b = 2, dfSSE = 120 - 2*3, g = 6, group = "B")[1]
+TukB = find.mult(alpha = 0.01, a = 3, b = 2, dfSSE = 120 - 2*3, g = 6, group = "B")[2]
+SchB = find.mult(alpha = 0.01, a = 3, b = 2, dfSSE = 120 - 2*3, g = 6, group = "B")[3]
+
+
+#6 Confidence Intervals: 
+
+#4 pairwise comparisons
+#mu1.-mu2.
+A.cs.1 = c(1,-1,0)
+scary.CI(the.data,MSE,equal.weights = FALSE,BonA,"A",A.cs.1)
+
+#mu1.-mu3.
+A.cs.2 = c(1,0,-1)
+scary.CI(the.data,MSE,equal.weights = FALSE,BonA,"A",A.cs.2)
+
+#mu2.-mu3.
+A.cs.3 = c(0,1,-1)
+scary.CI(the.data,MSE,equal.weights = FALSE, BonA,"A",A.cs.3)
+
+
+#mu.1-mu.2
+B.cs.1 = c(1,-1)
+scary.CI(the.data,MSE,equal.weights = FALSE, BonA,"B",B.cs.1)
+
+
+#2 contrasts
+AB.cs = t(matrix(0,nrow = a, ncol = b))
+AB.cs[1,1] = 1
+AB.cs[1,2] = -1/2
+AB.cs[1,3] = -1/2
+scary.CI(the.data,MSE,equal.weights = TRUE,BonA,"AB",AB.cs)
+
+
+#Second Contrast
+AB.cs2 = t(matrix(0,nrow = a, ncol = b))
+AB.cs2[2,1] = 1
+AB.cs2[2,2] = -1/2
+AB.cs2[2,3] = -1/2
+scary.CI(the.data,MSE,equal.weights = TRUE,BonA,"AB",AB.cs2)
+
+```
+
+$\mu_1.-\mu_2.$
+
+For each confidence interval we used the Bonferroni multiplier because it was the smallest of the three.
+
+A 99% confidence intervals for $\mu_1.-\mu_2.$ is (###,###).
+
+This means that we are 99% confident the true difference in annual salary in thousands of dollars between Data Scientists and Software Engineers is between ### and ###.
+
+$\mu_1.-\mu_3.$
+
+A 99% confidence intervals for $\mu_1.-\mu_3.$ is (###,###).
+
+This means that we are 99% confident the true difference in annual salary in thousands of dollars between Data Scientists and Bioinformatics Engineers is between ### and ###.
+
+$\mu_2.-\mu_3.$
+
+A 99% confidence intervals for $\mu_2.-\mu_3.$ is (###,###).
+
+This means that we are 99% confident the true difference in annual salary in thousands of dollars between Software Scientists and Bioinformatics Engineers is between ### and ###.
+
+$\mu._1-\mu._2$
+
+A 99% confidence intervals for $\mu._1-\mu._2$ is (###,###).
+
+This means that we are 99% confident the true difference in annual salary in thousands of dollars between technology workers in San Francisco and Seattle is between ### and ###.
+
+$\mu_{11}-\frac{1}{2}(\mu_{21}-\mu_{31})$
+
+A 99% confidence intervals for $\mu_{11}-\frac{1}{2}(\mu_{21}-\mu_{31})$ is (###,###).
+
+This means that we are 99% confident the true difference in annual salary in thousands of dollars between Data Scientists in San Francisco and the average of Software Engineers and Bioinformatics Engineers in San Francisco is between ### and ###.
+
+$\mu_{12}-\frac{1}{2}(\mu_{22}-\mu_{32})$
+
+A 99% confidence intervals for $\mu_{12}-\frac{1}{2}(\mu_{22}-\mu_{32})$ is (###,###).
+
+This means that we are 99% confident the true difference in annual salary in thousands of dollars between Data Scientists in Seattle and the average of Software Engineers and Bioinformatics Engineers in Seattle is between ### and ###.
+
+
+## Interpretation 
+
+We found that the best model to predict annual salary for technology workers is the model with interaction. $Y_{ijk}=\mu..+\gamma_i+\delta_j+(\gamma\delta)_{ij}+e_{ijk}$ where $Y$ is the annual income in thousands of dollars, $\mu..$ is the average annual income between all groups, $\gamma$ is the effect of factor A (Profession), $\delta$ is the effect of factor B (Region), $\gamma\delta$ is the interaction effect between the two groups, and $\epsilon$ is the error term.
+
+
+
+
+
+## Conclusion 
+
+
+
+
+# Appendix
+
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
+
