@@ -1,3 +1,3 @@
 # STA-106-Projects
 
-Visualize, transform, and analyze data.
+Midterm projects involving elements to visualize, transform, and analyze data. 
